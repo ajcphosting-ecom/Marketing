@@ -7,7 +7,9 @@ services:
     environment:
       NODE_ENV: production
       PORT: 3000
+      APP_BASE_URL: ${APP_BASE_URL:-http://localhost:3000}
       SESSION_SECRET: ${SESSION_SECRET:?set SESSION_SECRET in .env}
+      INTEGRATIONS_ENCRYPTION_KEY: ${INTEGRATIONS_ENCRYPTION_KEY:?set INTEGRATIONS_ENCRYPTION_KEY in .env}
       ADMIN_EMAIL: ${ADMIN_EMAIL:?set ADMIN_EMAIL in .env}
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:?set ADMIN_PASSWORD_HASH in .env, see npm run hash-password}
       ADMIN_NOTIFY_EMAIL: ${ADMIN_NOTIFY_EMAIL:-}

@@ -1,5 +1,6 @@
 const { html } = require("../../lib/html");
 const { layout } = require("../layout");
+const { ADMIN_NAV } = require("./nav");
 
 function fmtDate(iso) {
   if (!iso) return "—";
@@ -106,7 +107,7 @@ function adminDashboardPage({ stats, list, filters, csrfToken, flash }) {
   return layout({
     title: "Admin",
     tag: "Admin",
-    nav: [{ label: "Waitlist", href: "/admin" }],
+    nav: ADMIN_NAV,
     activePath: "/admin",
     body,
   });

@@ -8,8 +8,7 @@
 require("dotenv").config({ quiet: true });
 
 const { getDb, closeDb } = require("../db");
-const portal = require("../lib/portal");
-const bcrypt = require("bcryptjs");
+const clients = require("../lib/clients");
 
 const email = process.argv[2] || "demo@brandloop.example";
 const password = process.argv[3] || "demo-password-change-me";
@@ -19,21 +18,12 @@ function main() {
 
   let client = db.prepare("SELECT * FROM clients WHERE slug = ?").get("brandloop");
   if (!client) {
-    client = portal.createClient({ name: "Brandloop", slug: "brandloop" });
+    client = clients.createClient({ name: "Brandloop" });
     console.log(`[seed] created client "${client.name}" (id ${client.id})`);
   }
 
-  const existingUser = db.prepare("SELECT * FROM client_users WHERE email = ? COLLATE NOCASE").get(email);
-  if (existingUser) {
-    db.prepare("UPDATE client_users SET password_hash = ? WHERE id = ?").run(
-      bcrypt.hashSync(password, 10),
-      existingUser.id
-    );
-    console.log(`[seed] reset password for existing user ${email}`);
-  } else {
-    portal.createClientUser({ clientId: client.id, email, password });
-    console.log(`[seed] created client user ${email}`);
-  }
+  clients.createClientUserDirect(client.id, email, password);
+  console.log(`[seed] ensured client user ${email}`);
 
   seedExperiments(db, client.id);
   seedMetrics(db, client.id);

@@ -7,13 +7,14 @@ admin dashboard for managing leads, and the foundation for a client portal.
 ## What's in here
 
 ```
-public/            Static landing page (index.html, styles.css, script.js)
+public/             Static landing page (index.html, styles.css, script.js)
 db/                 SQLite schema + migration runner
-lib/                Backend logic (waitlist, email, auth, CSRF, portal data)
+lib/                Backend logic (waitlist, email, auth, CSRF, client data)
 lib/routes/         Express routers: admin dashboard, client portal
+lib/integrations/   Data-source connectors (Shopify/Meta/Google Ads/GA4) — stubs
 views/              Server-rendered HTML for admin + portal (no build step)
 scripts/            One-off CLI scripts (hash a password, seed demo data)
-test/               node --test suite for the waitlist API + admin auth
+test/               node --test suite (waitlist, admin auth, client management)
 server.js           Express app: wires everything together
 Dockerfile, docker-compose.yml   Production deploy
 ```
@@ -77,32 +78,62 @@ Login is rate-limited (10 attempts / 15 min) and CSRF-protected. This
 replaces the old `?key=...` query-param export from the prototype version —
 everything admin-related now requires a real login.
 
-## Phase 2: client portal (foundation, not yet wired to real data)
+The same login also covers **`/admin/clients`** — creating clients,
+inviting their users, and managing their experiments/metrics/integrations.
+See "Phase 2: client portal" below.
 
-`/portal` is where Ampcurve's clients will eventually log in to see their
-own performance dashboard. The plumbing is real — a `clients` /
-`client_users` table, bcrypt-hashed passwords, session auth, a dashboard
-that reads `experiments` and `metrics_snapshots` from the database and
-renders a real chart — but there's no ad-platform or analytics integration
-behind it yet. It's seeded with realistic demo numbers so you can see the
-shape of the product:
+## Phase 2: client portal
 
-```bash
-npm run seed:portal
-# or with your own demo credentials:
-npm run seed:portal -- you@example.com a-demo-password
-```
+`/portal` is where Ampcurve's clients log in to see their own performance
+dashboard. Client management is a real, usable admin feature now — you can
+run this with actual clients today, no external accounts required:
 
-This creates one demo client ("Brandloop") with 90 days of ROAS history and
-five sample experiments, and prints the login it created.
+- **`/admin/clients`** — create a client, invite their users by email
+  (bcrypt-hashed password, set via a one-time invite link — the link is
+  also shown directly in the admin UI, so this works even without SMTP
+  configured), log experiments and update their status/lift, and enter
+  daily ad-spend/revenue numbers by hand (ROAS is always computed
+  server-side from what you enter, never trusted as raw input).
+- Everything you enter shows up immediately on that client's `/portal`
+  dashboard — the same chart and experiments table Phase 1 shipped, now
+  fed by real admin input instead of only the seed script.
 
-**To actually launch this as a product**, the next steps are: an
-integration to pull real spend/revenue (Meta/Google Ads APIs, Shopify,
-GA4, or a CDP), a way to create real clients + invite their users (right
-now `lib/portal.js` has `createClient`/`createClientUser` helpers but no
-UI — you'd add an admin action or a signed invite-link flow), and probably
-per-client role/permission handling once more than one person per client
-needs a login.
+For a quick demo instead of a real client, `npm run seed:portal` still
+works — it creates one demo client ("Brandloop") with 90 days of ROAS
+history and five sample experiments, and prints the login it created.
+
+### Live data-source integrations (architecture in place, not connected)
+
+`/admin/clients/:id` also has an **Integrations** panel for Shopify, Meta
+Ads, Google Ads, and GA4 — this is the scaffold for pulling spend/revenue
+automatically instead of typing it in by hand:
+
+- Credentials you paste in are encrypted at rest (`lib/crypto.js`,
+  AES-256-GCM, key from `INTEGRATIONS_ENCRYPTION_KEY`) and stored per
+  client/provider in `client_integrations`.
+- Each provider has a connector module in `lib/integrations/` with the
+  interface `testConnection(credentials)` / `fetchDailyMetrics(credentials,
+  { since, until })`. **None of the four are implemented against a real
+  API yet** — calling "Sync now" always returns a clear "not implemented"
+  error today, recorded on the integration and shown in the admin UI,
+  rather than pretending to sync.
+- Each connector file (`lib/integrations/shopify.js`, `metaAds.js`,
+  `googleAds.js`, `ga4.js`) has a comment block with the exact endpoint,
+  required fields, and docs link for what a real implementation needs.
+
+**To connect a real provider:** get API credentials from that platform's
+developer console (this always happens outside this codebase — e.g. a
+Meta developer app, a Google Ads developer token, a Shopify custom app),
+paste them into that integration's form in the admin UI, then implement
+`fetchDailyMetrics` in the matching file under `lib/integrations/` so it
+calls the real API instead of throwing. It should return
+`[{ date, adSpend, revenue }, ...]`; `syncIntegration` in `lib/clients.js`
+takes care of writing those into `metrics_snapshots` (tagged with that
+provider as the `source`) and updating the integration's status.
+
+Once more than one person per client needs a login, or clients need
+different permission levels, that's the next layer to add on top of
+`client_users` — nothing here blocks it, it just isn't built yet.
 
 ## Security
 
@@ -113,8 +144,12 @@ needs a login.
 - Rate limiting on `/api/waitlist` and both login endpoints.
 - Admin/client passwords are bcrypt-hashed; nothing sensitive is stored in
   plaintext.
-- `SESSION_SECRET` is required (the app refuses to boot without one) when
-  `NODE_ENV=production`.
+- Integration credentials (Shopify/Meta/Google Ads/GA4 API keys) are
+  encrypted at rest with AES-256-GCM before they touch the database.
+- Invite links use a 24-byte random token, expire after 7 days, and can
+  only be used once.
+- `SESSION_SECRET` and `INTEGRATIONS_ENCRYPTION_KEY` are both required
+  (the app refuses to boot without them) when `NODE_ENV=production`.
 
 ## Deploying
 
@@ -152,9 +187,10 @@ and put nginx/Caddy in front for TLS + to serve as the reverse proxy.
 ### Environment variables reference
 
 See `.env.example` for the full list with explanations. The ones that
-matter for a production launch: `SESSION_SECRET`, `ADMIN_EMAIL`,
-`ADMIN_PASSWORD_HASH`, and the `SMTP_*` vars (skip these and email just
-logs to the console instead of sending).
+matter for a production launch: `SESSION_SECRET`, `INTEGRATIONS_ENCRYPTION_KEY`,
+`ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`, `APP_BASE_URL` (so invite links point
+at your real domain), and the `SMTP_*` vars (skip these and email just logs
+to the console instead of sending).
 
 ## Tests
 
@@ -163,8 +199,11 @@ npm test
 ```
 
 Runs against an isolated in-memory SQLite database (no state leaks between
-runs). Covers: waitlist validation/dedup/honeypot/rate-limiting, and admin
-login/CSRF/session auth.
+runs). 16 tests covering: waitlist validation/dedup/honeypot/rate-limiting,
+admin login/CSRF/session auth, client creation, the invite → accept-invite
+→ logged-in-portal flow (including single-use enforcement), manual metric
+entry (server-computed ROAS), and the integration credential
+encryption/sync-failure path.
 
 ## Editing the landing page
 

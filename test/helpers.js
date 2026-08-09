@@ -38,4 +38,19 @@ function extractCsrf(html) {
   return m ? m[1] : null;
 }
 
-module.exports = { app, startServer, getCookie, extractCsrf, ADMIN_PASSWORD };
+/** Logs in as the test admin account, returns a session cookie string. */
+async function adminLogin(baseUrl) {
+  const loginPage = await fetch(`${baseUrl}/admin/login`);
+  const cookie = getCookie(loginPage);
+  const csrf = extractCsrf(await loginPage.text());
+
+  const res = await fetch(`${baseUrl}/admin/login`, {
+    method: "POST",
+    headers: { "Content-Type": "application/x-www-form-urlencoded", Cookie: cookie },
+    body: new URLSearchParams({ email: "admin@test.local", password: ADMIN_PASSWORD, _csrf: csrf }),
+    redirect: "manual",
+  });
+  return getCookie(res);
+}
+
+module.exports = { app, startServer, getCookie, extractCsrf, adminLogin, ADMIN_PASSWORD };
