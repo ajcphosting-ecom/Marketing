@@ -1,0 +1,9 @@
+node_modules
+npm-debug.log*
+.git
+.env
+data/*.sqlite
+data/*.sqlite-*
+data/waitlist.json
+*.md
+.DS_Store
