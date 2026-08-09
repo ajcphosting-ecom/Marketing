@@ -10,11 +10,12 @@ admin dashboard for managing leads, and the foundation for a client portal.
 public/             Static landing page (index.html, styles.css, script.js)
 db/                 SQLite schema + migration runner
 lib/                Backend logic (waitlist, email, auth, CSRF, client data)
-lib/routes/         Express routers: admin dashboard, client portal
+lib/routes/         Express routers: admin dashboard, client portal, webhooks
 lib/integrations/   Data-source connectors (Shopify/Meta/Google Ads/GA4) — stubs
+lib/billing/        Whop signature verification + event mapping
 views/              Server-rendered HTML for admin + portal (no build step)
-scripts/            One-off CLI scripts (hash a password, seed demo data)
-test/               node --test suite (waitlist, admin auth, client management)
+scripts/            One-off CLI scripts (hash a password, seed demo data, test email)
+test/               node --test suite (waitlist, admin auth, client mgmt, billing)
 server.js           Express app: wires everything together
 Dockerfile, docker-compose.yml   Production deploy
 ```
@@ -186,6 +187,61 @@ Once more than one person per client needs a login, or clients need
 different permission levels, that's the next layer to add on top of
 `client_users` — nothing here blocks it, it just isn't built yet.
 
+## Billing (Whop)
+
+Ampcurve uses [Whop](https://whop.com) to actually collect payment from
+clients.
+
+**Confidence note, read this first:** this was built without access to
+Whop's live developer docs — `docs.whop.com` was unreachable from the
+sandbox this was written in, only public search-result snippets were
+available. What follows the publicly documented ["Standard
+Webhooks"](https://www.standardwebhooks.com/) spec (signature headers,
+HMAC-SHA256, the `whsec_` secret format) should be correct, since that's a
+stable spec Whop's own docs state they conform to. What's **not**
+independently verified: the exact event-type strings and payload field
+names Whop actually sends — `lib/billing/whop.js` pattern-matches on
+event names like `payment.succeeded` / `membership.deactivated` and reads
+`data.email`, based on those search snippets, not a confirmed live
+payload. Every webhook delivery — verified or not, mapped to a client or
+not — is logged raw at **`/admin/webhooks`** specifically so you can check
+this against reality once you have one.
+
+### How it works
+
+- Each client has a `whop_checkout_url` (paste the link from a plan you
+  create in your own Whop dashboard — Ampcurve doesn't call Whop's API to
+  create anything) and a `billing_status` (`none` / `active` / `past_due`
+  / `cancelled`), both editable in `/admin/clients/:id`.
+- `POST /webhooks/whop` receives events from Whop, verifies the signature,
+  and — if it recognizes the event and can match the payment to a client
+  by email (against `client_users.email`) — updates that client's
+  `billing_status` automatically.
+- Anything it can't confidently handle (bad signature, unrecognized event,
+  no matching client) is logged with a "needs review" flag rather than
+  silently dropped or guessed at, and never touches billing_status.
+- You can always override `billing_status` by hand in the admin UI — for
+  a manual sale, a payment collected outside Whop, or while the webhook
+  mapping above is still unverified.
+
+### Setup
+
+1. Create your product/plan in the Whop dashboard, get the checkout link,
+   paste it into the client's Billing panel in `/admin/clients/:id`.
+2. Whop dashboard → Developer → Create Webhook → URL:
+   `${APP_BASE_URL}/webhooks/whop` (e.g. `https://ampcurve.co/webhooks/whop`)
+   → select the payment/membership events.
+3. Copy the webhook signing secret Whop gives you, set:
+   ```
+   WHOP_WEBHOOK_SECRET=whsec_...
+   ```
+4. Trigger a real test payment (or whatever test-event feature Whop's
+   dashboard offers), then check `/admin/webhooks` — confirm the event
+   name and `data` shape match what `lib/billing/whop.js`
+   (`mapEventToBilling`) expects. If they don't, that function is the only
+   place to adjust — the signature verification underneath it doesn't
+   need to change.
+
 ## Security
 
 - `helmet` for standard HTTP security headers.
@@ -197,6 +253,9 @@ different permission levels, that's the next layer to add on top of
   plaintext.
 - Integration credentials (Shopify/Meta/Google Ads/GA4 API keys) are
   encrypted at rest with AES-256-GCM before they touch the database.
+- Inbound Whop webhooks are signature-verified (Standard Webhooks spec,
+  HMAC-SHA256, timestamp tolerance against replay) before anything in the
+  payload is trusted; unverified deliveries update nothing.
 - Invite links use a 24-byte random token, expire after 7 days, and can
   only be used once.
 - `SESSION_SECRET` and `INTEGRATIONS_ENCRYPTION_KEY` are both required
@@ -240,10 +299,11 @@ and put nginx/Caddy in front for TLS + to serve as the reverse proxy.
 See `.env.example` for the full list with explanations. The ones that
 matter for a production launch: `SESSION_SECRET`, `INTEGRATIONS_ENCRYPTION_KEY`,
 `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`, `APP_BASE_URL` (so invite links point
-at your real domain), and the `SMTP_*` vars — see "Setting up Resend" above;
-skip them and email just logs to the console instead of sending. After
-setting them, confirm with `npm run test-email -- you@example.com` before
-relying on them for real signups.
+at your real domain), `WHOP_WEBHOOK_SECRET` (see "Billing (Whop)"), and the
+`SMTP_*` vars — see "Setting up Resend" above; skip them and email just
+logs to the console instead of sending. After setting them, confirm with
+`npm run test-email -- you@example.com` before relying on them for real
+signups.
 
 ## Tests
 
@@ -252,13 +312,15 @@ npm test
 ```
 
 Runs against an isolated in-memory SQLite database (no state leaks between
-runs). 21 tests covering: waitlist validation/dedup/honeypot/rate-limiting,
+runs). 32 tests covering: waitlist validation/dedup/honeypot/rate-limiting,
 admin login/CSRF/session auth, client creation, the invite → accept-invite
 → logged-in-portal flow (including single-use enforcement), manual metric
 entry (server-computed ROAS), the integration credential
-encryption/sync-failure path, and SMTP transport config (including the
-exact Resend settings) — that last one is config-shape only, it doesn't
-send real email, so it needs no real credentials to run in CI.
+encryption/sync-failure path, SMTP transport config (including the exact
+Resend settings), and Whop webhook signature verification + event mapping
+(valid/tampered/replayed/unmatched, using self-constructed signed
+fixtures). None of these send real email or call a real payment provider —
+they need no real credentials to run in CI.
 
 ## Editing the landing page
 

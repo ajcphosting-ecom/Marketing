@@ -13,6 +13,7 @@ services:
       ADMIN_EMAIL: ${ADMIN_EMAIL:?set ADMIN_EMAIL in .env}
       ADMIN_PASSWORD_HASH: ${ADMIN_PASSWORD_HASH:?set ADMIN_PASSWORD_HASH in .env, see npm run hash-password}
       ADMIN_NOTIFY_EMAIL: ${ADMIN_NOTIFY_EMAIL:-}
+      WHOP_WEBHOOK_SECRET: ${WHOP_WEBHOOK_SECRET:-}
       MAIL_FROM: ${MAIL_FROM:-Ampcurve <hello@ampcurve.co>}
       SMTP_HOST: ${SMTP_HOST:-}
       SMTP_PORT: ${SMTP_PORT:-587}

@@ -22,6 +22,63 @@ function integrationChip(status) {
   return html`<span class="chip chip-${map[status] || "paused"}">${label}</span>`;
 }
 
+function billingChip(status) {
+  const map = { none: "paused", active: "won", past_due: "lost", cancelled: "lost" };
+  return html`<span class="chip chip-${map[status] || "paused"}">${status.replace("_", " ")}</span>`;
+}
+
+function billingPanel({ client, csrfToken }) {
+  return html`
+    <div class="panel" style="margin-bottom:24px;">
+      <div class="panel-head">
+        <h2>Billing</h2>
+        ${billingChip(client.billing_status)}
+      </div>
+
+      ${client.whop_membership_id
+        ? html`<div style="padding:14px 20px 0;" class="muted">Whop membership: <span class="mono">${client.whop_membership_id}</span></div>`
+        : ""}
+
+      <div style="padding:16px 20px; border-top:1px solid var(--line);">
+        <div class="muted" style="margin-bottom:10px;">
+          Set automatically by the Whop webhook once it's configured (see README "Billing (Whop)").
+          Until then — or if you get paid outside Whop — set it here manually.
+        </div>
+        <form method="POST" action="/admin/clients/${client.id}/billing/status"
+          style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+          <input type="hidden" name="_csrf" value="${csrfToken}" />
+          <div class="field" style="margin-bottom:0;">
+            <label for="billing-status">Status</label>
+            <select id="billing-status" name="status">
+              ${["none", "active", "past_due", "cancelled"].map(
+                (s) => html`<option value="${s}" ${client.billing_status === s ? "selected" : ""}>${s}</option>`
+              )}
+            </select>
+          </div>
+          <button type="submit" class="btn btn-ghost btn-sm">Update status</button>
+        </form>
+      </div>
+
+      <div style="padding:16px 20px; border-top:1px solid var(--line);">
+        <form method="POST" action="/admin/clients/${client.id}/billing/checkout-url"
+          style="display:flex; gap:10px; flex-wrap:wrap; align-items:flex-end;">
+          <input type="hidden" name="_csrf" value="${csrfToken}" />
+          <div class="field" style="margin-bottom:0; flex:1 1 320px;">
+            <label for="checkout-url">Whop checkout link</label>
+            <input type="url" id="checkout-url" name="url" placeholder="https://whop.com/checkout/..."
+              value="${client.whop_checkout_url || ""}" style="width:100%;" />
+          </div>
+          <button type="submit" class="btn btn-ghost btn-sm">Save link</button>
+        </form>
+        <p class="muted" style="margin-top:8px;">
+          Create the plan/checkout in your Whop dashboard, paste the resulting link here — send it to
+          the client yourself (email, call) however fits your sales process.
+        </p>
+      </div>
+    </div>
+  `;
+}
+
 function usersAndInvites({ client, users, invites, csrfToken, appBaseUrl }) {
   return html`
     <div class="panel" style="margin-bottom:24px;">
@@ -216,6 +273,7 @@ function clientDetailPage({ client, users, invites, experiments, metrics, integr
 
     ${flash ? html`<div class="flash-box">${flash}</div>` : ""}
 
+    ${billingPanel({ client, csrfToken })}
     ${usersAndInvites({ client, users, invites, csrfToken, appBaseUrl })}
     ${experimentsPanel({ client, experiments, csrfToken })}
     ${metricsPanel({ client, metrics, csrfToken })}

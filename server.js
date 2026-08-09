@@ -17,6 +17,7 @@ const email = require("./lib/email");
 const { configureSession } = require("./lib/auth");
 const adminRouter = require("./lib/routes/admin");
 const portalRouter = require("./lib/routes/portal");
+const webhooksRouter = require("./lib/routes/webhooks");
 
 const app = express();
 const PORT = process.env.PORT || 3000;
@@ -34,6 +35,11 @@ app.use(
     contentSecurityPolicy: false,
   })
 );
+// Mounted before express.json(): webhook signature verification needs the
+// raw, byte-for-byte request body, so /webhooks/* parses its own body
+// (express.raw) rather than going through the app-wide JSON parser below.
+app.use("/webhooks", webhooksRouter);
+
 app.use(express.json({ limit: "10kb" }));
 configureSession(app);
 
