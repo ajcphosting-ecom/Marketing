@@ -5,7 +5,7 @@
 <meta name="viewport" content="width=device-width, initial-scale=1.0" />
 <title>Ampcurve — Marketing that compounds</title>
 <meta name="description" content="Ampcurve is a data-driven marketing optimization agency. We turn your existing traffic and ad spend into predictable, compounding growth through relentless testing, attribution, and creative iteration. Join the waitlist." />
-<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2222%22 fill=%22%237c5cff%22/><path d=%22M20 78 L40 45 L55 60 L82 20%22 stroke=%22%230b0d12%22 stroke-width=%229%22 fill=%22none%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>" />
+<link rel="icon" href="data:image/svg+xml,<svg xmlns=%22http://www.w3.org/2000/svg%22 viewBox=%220 0 100 100%22><rect width=%22100%22 height=%22100%22 rx=%2218%22 fill=%22%23f0a63c%22/><path d=%22M18 76 L40 46 L54 60 L84 18%22 stroke=%22%230e1420%22 stroke-width=%2210%22 fill=%22none%22 stroke-linecap=%22round%22 stroke-linejoin=%22round%22/></svg>" />
 <link rel="stylesheet" href="styles.css" />
 </head>
 <body>
@@ -16,7 +16,7 @@
       <span class="brand-mark"></span>
       Ampcurve
     </a>
-    <ul class="nav-links">
+    <ul class="nav-links mono">
       <li><a href="#what-we-do">What we do</a></li>
       <li><a href="#how-it-works">How it works</a></li>
       <li><a href="#faq">FAQ</a></li>
@@ -29,40 +29,54 @@
 
   <!-- Hero -->
   <header class="hero">
-    <div class="wrap">
-      <span class="badge"><span class="dot"></span> Now accepting founding clients — early 2026</span>
-      <h1>Marketing that <span class="grad">compounds.</span></h1>
-      <p class="lead">
-        Ampcurve is a data-driven marketing optimization agency. We turn the traffic
-        and ad spend you already have into predictable, compounding growth — through
-        relentless testing, attribution, and creative iteration.
-      </p>
-
-      <form id="waitlist-form" class="waitlist-form" novalidate>
-        <div class="form-row">
-          <label for="email" class="sr-only" style="position:absolute;left:-9999px;">Email address</label>
-          <input type="email" id="email" name="email" placeholder="you@company.com" required autocomplete="email" />
-          <button type="submit" class="btn" id="submit-btn">Join the waitlist</button>
-        </div>
-
-        <select id="priority" name="priority" class="priority-select">
-          <option value="">What's your biggest growth priority right now? (optional)</option>
-          <option value="conversion-rate">Improving conversion rate</option>
-          <option value="paid-media">Getting more from paid media / ROAS</option>
-          <option value="attribution">Understanding what's actually working</option>
-          <option value="creative">Creative that stops performing</option>
-          <option value="not-sure">Not sure yet</option>
-        </select>
-
-        <!-- honeypot field, hidden from real users -->
-        <input type="text" name="company_website" class="honeypot" tabindex="-1" autocomplete="off" />
-
-        <p class="form-note">
-          Founding members get 20% off their first 3 months + a free growth audit.
-          No spam — just a note when we open the doors.
+    <div class="wrap hero-grid">
+      <div>
+        <span class="badge mono"><span class="dot"></span> Founding cohort — opening early 2026</span>
+        <h1>Marketing that<br /><em>compounds.</em></h1>
+        <p class="lead">
+          Ampcurve is a data-driven marketing optimization agency. We turn the traffic
+          and ad spend you already have into predictable, compounding growth — through
+          relentless testing, attribution, and creative iteration.
         </p>
-        <p class="form-msg" id="form-msg" role="status" aria-live="polite"></p>
-      </form>
+
+        <form id="waitlist-form" class="waitlist-form" novalidate>
+          <div class="form-row">
+            <label for="email" style="position:absolute;left:-9999px;">Email address</label>
+            <input type="email" id="email" name="email" placeholder="you@company.com" required autocomplete="email" />
+            <button type="submit" class="btn" id="submit-btn">Join the waitlist</button>
+          </div>
+
+          <select id="priority" name="priority" class="priority-select">
+            <option value="">What's your biggest growth priority right now? (optional)</option>
+            <option value="conversion-rate">Improving conversion rate</option>
+            <option value="paid-media">Getting more from paid media / ROAS</option>
+            <option value="attribution">Understanding what's actually working</option>
+            <option value="creative">Creative that stops performing</option>
+            <option value="not-sure">Not sure yet</option>
+          </select>
+
+          <!-- honeypot field, hidden from real users -->
+          <input type="text" name="company_website" class="honeypot" tabindex="-1" autocomplete="off" />
+
+          <p class="form-note">
+            Founding members get 20% off their first 3 months + a free growth audit.
+            No spam — just a note when we open the doors.
+          </p>
+          <p class="form-msg" id="form-msg" role="status" aria-live="polite"></p>
+        </form>
+      </div>
+
+      <div class="chart-panel">
+        <div class="chart-head">
+          <span class="chart-label mono">Blended ROAS, 90-day test cohort</span>
+        </div>
+        <div class="chart-value">3.8x <span class="delta">+142%</span></div>
+        <canvas id="curve" width="600" height="380" role="img" aria-label="Line chart showing blended return on ad spend rising from 1.6x to 3.8x over a 90 day testing period"></canvas>
+        <div class="chart-foot">
+          <span>DAY 1 · 1.6x</span>
+          <span>DAY 90 · 3.8x</span>
+        </div>
+      </div>
     </div>
   </header>
 
@@ -75,29 +89,29 @@
   <!-- What we do -->
   <section id="what-we-do">
     <div class="wrap">
-      <div class="section-head">
-        <span class="eyebrow">What we do</span>
+      <div class="section-head center">
+        <span class="eyebrow mono">What we do</span>
         <h2>Four levers. One compounding curve.</h2>
         <p>We don't chase every channel — we systematically optimize the ones already driving your revenue.</p>
       </div>
       <div class="grid">
         <div class="card">
-          <div class="icon">📈</div>
+          <span class="tag mono">CRO</span>
           <h3>Conversion Rate Optimization</h3>
           <p>Structured A/B and multivariate testing on your site and funnel — not redesigns based on opinion.</p>
         </div>
         <div class="card">
-          <div class="icon">🎯</div>
+          <span class="tag mono">Paid media</span>
           <h3>Paid Media Optimization</h3>
           <p>Audit, restructure, and continuously tune your paid channels so every dollar works harder.</p>
         </div>
         <div class="card">
-          <div class="icon">🧭</div>
+          <span class="tag mono">Attribution</span>
           <h3>Attribution &amp; Analytics</h3>
           <p>A clear, trustworthy view of what's actually driving revenue — so decisions stop being guesses.</p>
         </div>
         <div class="card">
-          <div class="icon">🎨</div>
+          <span class="tag mono">Creative</span>
           <h3>Creative &amp; Landing Page Testing</h3>
           <p>Ongoing creative iteration and landing page experiments built around what the data says converts.</p>
         </div>
@@ -106,10 +120,10 @@
   </section>
 
   <!-- How it works -->
-  <section id="how-it-works" style="background:var(--bg-soft); border-top:1px solid var(--panel-border); border-bottom:1px solid var(--panel-border);">
+  <section id="how-it-works" style="background:var(--ink-soft); border-top:1px solid var(--line); border-bottom:1px solid var(--line);">
     <div class="wrap">
-      <div class="section-head">
-        <span class="eyebrow">How it works</span>
+      <div class="section-head center">
+        <span class="eyebrow mono">How it works</span>
         <h2>A simple loop, run relentlessly.</h2>
         <p>No 40-page strategy decks. Just a tight cycle that compounds week over week.</p>
       </div>
@@ -143,8 +157,8 @@
     <div class="wrap">
       <div class="benefits">
         <div>
-          <span class="eyebrow">Founding members</span>
-          <h2 style="font-size:2rem; letter-spacing:-0.02em; margin:0 0 24px;">Why join the waitlist?</h2>
+          <span class="eyebrow mono">Founding members</span>
+          <h2 style="font-family:var(--font-display); font-size:2rem; letter-spacing:-0.01em; margin:0 0 24px; text-wrap:balance;">Why join the waitlist?</h2>
           <ul class="benefits-list">
             <li><span class="check">✓</span><span><strong>Founding pricing.</strong> 20% off your first 3 months, locked in for as long as you stay.</span></li>
             <li><span class="check">✓</span><span><strong>Free growth audit.</strong> A no-obligation teardown of your funnel and paid spend before you commit.</span></li>
@@ -163,10 +177,10 @@
   </section>
 
   <!-- FAQ -->
-  <section id="faq" style="background:var(--bg-soft); border-top:1px solid var(--panel-border); border-bottom:1px solid var(--panel-border);">
+  <section id="faq" style="background:var(--ink-soft); border-top:1px solid var(--line); border-bottom:1px solid var(--line);">
     <div class="wrap">
-      <div class="section-head">
-        <span class="eyebrow">FAQ</span>
+      <div class="section-head center">
+        <span class="eyebrow mono">FAQ</span>
         <h2>Questions, answered.</h2>
       </div>
       <div class="faq">
