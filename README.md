@@ -63,6 +63,57 @@ IP. A successful signup:
 Email sending never blocks the API response — if SMTP isn't configured,
 emails are logged to the console instead so everything still works in dev.
 
+## Setting up Resend (real outbound email)
+
+The app sends real email through any standard SMTP provider — this is the
+walkthrough for [Resend](https://resend.com), the recommended one (free up
+to 3,000 emails/month, no credit card to start).
+
+1. **Sign up** at resend.com.
+2. **Get sending working immediately (no domain yet):** Resend gives every
+   account a shared test address, `onboarding@resend.dev`, that works with
+   no setup. Set:
+   ```
+   MAIL_FROM=Ampcurve <onboarding@resend.dev>
+   ```
+   Caveat: mail from this address can only be delivered to the email
+   address on your own Resend account — fine for testing the wiring, not
+   for real waitlist signups.
+3. **For real signups to receive email, verify your domain:** in the Resend
+   dashboard, Domains → Add Domain → enter your domain (e.g. `ampcurve.co`)
+   → Resend gives you 3 DNS records (SPF, DKIM, DMARC) to add at your
+   domain registrar. Verification is usually automatic within minutes of
+   adding them. Once verified, set:
+   ```
+   MAIL_FROM=Ampcurve <hello@ampcurve.co>
+   ```
+   (any address `@` your verified domain works, doesn't need to exist as
+   a real inbox).
+4. **Create an API key:** Resend dashboard → API Keys → Create API Key.
+   Copy it — Resend only shows it once.
+5. **Set the SMTP env vars** (in `.env` locally, or your host's/Docker
+   Compose's env config in production):
+   ```
+   SMTP_HOST=smtp.resend.com
+   SMTP_PORT=465
+   SMTP_SECURE=true
+   SMTP_USER=resend
+   SMTP_PASS=<the API key from step 4>
+   ```
+   (`SMTP_USER=resend` is literal — that's the username Resend's SMTP relay
+   expects, not a placeholder for your own username.)
+6. **Test it**:
+   ```bash
+   npm run test-email -- you@example.com
+   ```
+   Sends one real email through the config above and reports success/failure.
+   If it fails, the error message is Resend's own (e.g. "domain not
+   verified", "invalid API key") — fix that before relying on it for real
+   signups.
+7. Restart the app (`npm start` / redeploy) so it picks up the new env vars.
+
+Full reference: [Resend's SMTP docs](https://resend.com/docs/send-with-smtp).
+
 ## Admin dashboard
 
 `/admin` is a session-protected dashboard (single admin account, configured
@@ -189,8 +240,10 @@ and put nginx/Caddy in front for TLS + to serve as the reverse proxy.
 See `.env.example` for the full list with explanations. The ones that
 matter for a production launch: `SESSION_SECRET`, `INTEGRATIONS_ENCRYPTION_KEY`,
 `ADMIN_EMAIL`, `ADMIN_PASSWORD_HASH`, `APP_BASE_URL` (so invite links point
-at your real domain), and the `SMTP_*` vars (skip these and email just logs
-to the console instead of sending).
+at your real domain), and the `SMTP_*` vars — see "Setting up Resend" above;
+skip them and email just logs to the console instead of sending. After
+setting them, confirm with `npm run test-email -- you@example.com` before
+relying on them for real signups.
 
 ## Tests
 
@@ -199,11 +252,13 @@ npm test
 ```
 
 Runs against an isolated in-memory SQLite database (no state leaks between
-runs). 16 tests covering: waitlist validation/dedup/honeypot/rate-limiting,
+runs). 21 tests covering: waitlist validation/dedup/honeypot/rate-limiting,
 admin login/CSRF/session auth, client creation, the invite → accept-invite
 → logged-in-portal flow (including single-use enforcement), manual metric
-entry (server-computed ROAS), and the integration credential
-encryption/sync-failure path.
+entry (server-computed ROAS), the integration credential
+encryption/sync-failure path, and SMTP transport config (including the
+exact Resend settings) — that last one is config-shape only, it doesn't
+send real email, so it needs no real credentials to run in CI.
 
 ## Editing the landing page
 

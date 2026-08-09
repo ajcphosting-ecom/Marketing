@@ -10,6 +10,7 @@
     "migrate": "node -e \"require('./db').getDb(); console.log('Migrations up to date.');\"",
     "seed:portal": "node scripts/seed-portal-demo.js",
     "hash-password": "node scripts/hash-password.js",
+    "test-email": "node scripts/send-test-email.js",
     "test": "node --test test/*.test.js"
   },
   "engines": {
