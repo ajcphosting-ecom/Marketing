@@ -9,6 +9,17 @@ FROM node:22-slim
 ENV NODE_ENV=production
 WORKDIR /app
 
+# better-sqlite3 ships prebuilt binaries for common platforms, but falls back
+# to compiling its native binding from source (node-gyp) whenever no
+# prebuild matches the build host's OS/arch/Node ABI — e.g. on several
+# hosted CI/build platforms. node:22-slim doesn't include that toolchain by
+# default, so install it before `npm ci`; the compiled output is a static
+# .node file that needs no toolchain to run afterward. Left installed
+# (rather than purged in a later layer) since removing it wouldn't actually
+# shrink a non-squashed single-stage image anyway.
+RUN apt-get update && apt-get install -y --no-install-recommends python3 make g++ \
+  && rm -rf /var/lib/apt/lists/*
+
 COPY package.json package-lock.json ./
 RUN npm ci --omit=dev
 
