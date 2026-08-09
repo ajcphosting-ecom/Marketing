@@ -121,10 +121,39 @@ test("POST /webhooks/whop with a valid signature updates a matched client's bill
   assert.equal(latest.client_id, client.id);
 });
 
-test("POST /webhooks/whop flags a verified-but-unmatched billing event for review", async () => {
+test("POST /webhooks/whop auto-provisions a client for an unmatched active payment", async () => {
   const { rawBody, headers } = sign({
     event: "payment.succeeded",
-    data: { email: "nobody-registered@example.com" },
+    data: { email: "nobody-registered@example.com", membership_id: "mem_new" },
+  });
+
+  const res = await fetch(`${ctx.baseUrl}/webhooks/whop`, {
+    method: "POST",
+    headers: { "Content-Type": "application/json", ...headers },
+    body: rawBody,
+  });
+  assert.equal(res.status, 200);
+
+  const [latest] = webhookEvents.listRecentEvents("whop", 1);
+  assert.equal(latest.verified, 1);
+  assert.equal(latest.needs_review, 0);
+  assert.ok(latest.client_id);
+
+  const client = clientsDb.getClientById(latest.client_id);
+  assert.equal(client.billing_status, "active");
+  assert.equal(client.whop_membership_id, "mem_new");
+
+  const users = clientsDb.getClientUsers(client.id);
+  assert.equal(users.length, 0); // no portal login yet — just an invite
+  const invites = clientsDb.listPendingInvites(client.id);
+  assert.equal(invites.length, 1);
+  assert.equal(invites[0].email, "nobody-registered@example.com");
+});
+
+test("POST /webhooks/whop flags a verified-but-unmatched non-active event for review", async () => {
+  const { rawBody, headers } = sign({
+    event: "payment.cancelled",
+    data: { email: "no-such-client@example.com" },
   });
 
   const res = await fetch(`${ctx.baseUrl}/webhooks/whop`, {

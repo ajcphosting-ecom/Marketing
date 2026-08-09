@@ -14,6 +14,7 @@ const path = require("path");
 const { getDb, closeDb } = require("./db");
 const waitlist = require("./lib/waitlist");
 const email = require("./lib/email");
+const ai = require("./lib/ai");
 const { configureSession } = require("./lib/auth");
 const adminRouter = require("./lib/routes/admin");
 const portalRouter = require("./lib/routes/portal");
@@ -89,6 +90,16 @@ app.post("/api/waitlist", waitlistLimiter, async (req, res) => {
     console.error("[email] admin notice failed:", err.message);
   });
 
+  // Fire-and-forget: the free growth audit is a nice-to-have follow-up, not
+  // part of signing up — skip silently if AI isn't configured, and never
+  // let a slow/failed Claude call affect the signup response.
+  if (ai.isConfigured()) {
+    ai
+      .generateGrowthAudit({ priority })
+      .then((bodyText) => email.sendGrowthAudit({ email: emailAddr, bodyText }))
+      .catch((err) => console.error("[ai] growth audit failed:", err.message));
+  }
+
   return res.status(201).json({ ok: true, position, id: entry.id });
 });
 
@@ -122,8 +133,11 @@ if (require.main === module) {
     console.log(`  Portal: http://localhost:${PORT}/portal/login`);
   });
 
+  const scheduledTask = require("./lib/scheduler").start();
+
   const shutdown = (signal) => {
     console.log(`\n${signal} received, shutting down…`);
+    if (scheduledTask) scheduledTask.stop();
     server.close(() => {
       closeDb();
       process.exit(0);

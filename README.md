@@ -13,9 +13,12 @@ lib/                Backend logic (waitlist, email, auth, CSRF, client data)
 lib/routes/         Express routers: admin dashboard, client portal, webhooks
 lib/integrations/   Data-source connectors (Shopify/Meta/Google Ads/GA4) — stubs
 lib/billing/        Whop signature verification + event mapping
+lib/ai.js           Claude API wrapper (weekly reports, suggestions, growth audits)
+lib/reports.js      Weekly report stats + send logic
+lib/scheduler.js    In-process weekly cron job
 views/              Server-rendered HTML for admin + portal (no build step)
-scripts/            One-off CLI scripts (hash a password, seed demo data, test email)
-test/               node --test suite (waitlist, admin auth, client mgmt, billing)
+scripts/            One-off CLI scripts (hash a password, seed demo data, test email, send reports)
+test/               node --test suite (waitlist, admin auth, client mgmt, billing, AI automation)
 server.js           Express app: wires everything together
 Dockerfile, docker-compose.yml   Production deploy
 ```
@@ -242,6 +245,99 @@ this against reality once you have one.
    place to adjust — the signature verification underneath it doesn't
    need to change.
 
+## AI automation
+
+This is the part that lets you sell Ampcurve without personally delivering
+every hour of the work. It's an **AI-assisted automation layer**, not
+autonomous account management — read the boundary below before turning it
+on.
+
+**The boundary, stated plainly:** nothing in this section ever touches a
+live ad account, spends a client's money, or changes anything on a
+client's site by itself. Claude only ever writes text (report copy,
+experiment ideas, audit emails) or proposes a suggestion that sits in a
+"pending" queue until a human clicks **Approve**. If a future integration
+adds the ability to actually push a change to a real ad account, that's a
+separate, deliberate feature this codebase does not have — don't wire an
+approval button up to auto-apply without treating that as a new decision,
+not a config flag.
+
+All of it is optional and additive: with no `ANTHROPIC_API_KEY` set, the
+app runs exactly as it did before this section existed — no crashes, no
+missing core features, just these extras silently disabled (each spot that
+skips says so in its own log line or UI copy).
+
+### What's automated
+
+1. **Auto-onboarding.** When a Whop payment webhook comes in for an email
+   that doesn't match an existing client, Ampcurve provisions the client
+   record and emails a portal invite automatically — no admin step
+   required between "someone paid" and "they can log in." (This part
+   needs no API key; it's plain code, not AI.) See "Billing (Whop)" above
+   for the event-matching mechanics.
+2. **Weekly AI client reports.** Once a week (Monday 08:00 UTC by
+   default), every client with portal users and at least one day of
+   metrics gets an emailed performance update: blended ROAS and its
+   week-over-week change, recent experiment results, what's being tested
+   next. All the numbers are computed in plain JS (`lib/reports.js`
+   `computeStats()`) before the model ever sees them — Claude narrates the
+   given numbers, it never calculates them, so it can't misreport a
+   figure. Runs in-process via `node-cron` (`lib/scheduler.js`) as long as
+   the server stays up; for serverless/sleeping hosts, run
+   `npm run send-weekly-reports` on an external cron instead (same job,
+   triggered manually or by cron rather than the in-process scheduler).
+3. **AI experiment suggestions.** On a client's detail page, click
+   "Suggest with AI" to get 3-5 candidate next experiments (CRO, paid
+   media, creative) grounded in that client's recent performance and past
+   experiment results — it won't repeat a loser or duplicate a winner
+   already logged. Suggestions land in a pending list under the
+   experiments table with **Approve** / **Dismiss** per idea. Approving
+   turns it into a real, running experiment row (same as adding one by
+   hand); dismissing just discards it. Nothing is auto-approved, ever.
+4. **Free growth audits.** After someone joins the waitlist, they get a
+   second email with a genuinely useful framework for their stated
+   priority (conversion rate / paid media / attribution / creative) — the
+   2-3 things worth checking first and why. It's explicitly framed as "what
+   we'd check first," never as findings about their specific site, since
+   at signup time all Ampcurve has is an email and a priority.
+
+### Setup
+
+```
+ANTHROPIC_API_KEY=sk-ant-...
+```
+
+Get a key at [console.anthropic.com](https://console.anthropic.com). That's
+the only required variable — everything above turns on with it set. Two
+more are optional:
+
+```
+ANTHROPIC_MODEL=claude-opus-5      # override the model (defaults to claude-opus-5)
+REPORTS_CRON=0 8 * * 1             # override the weekly report schedule (cron syntax)
+REPORTS_TIMEZONE=UTC               # timezone the cron schedule is evaluated in
+```
+
+To send this week's reports right now instead of waiting for Monday (or as
+your external-cron trigger on a host that sleeps the process):
+
+```bash
+npm run send-weekly-reports
+```
+
+### What's not covered by tests
+
+`lib/ai.js` makes real Claude API calls — there are no fake/mocked API
+responses in this test suite, and no `ANTHROPIC_API_KEY` is assumed to be
+present when tests run. What *is* tested (`test/ai-automation.test.js`):
+the pure `computeStats()` math, the suggestion approve/dismiss database
+logic end-to-end, and that every AI-touching route/scheduler degrades
+gracefully (redirects with a flash, logs a warning, returns `null`) rather
+than throwing when the key is absent. Before relying on this in
+production, do at least one manual pass with a real key: trigger a
+suggestion, send a real weekly report, check a real growth-audit email —
+`npm run send-weekly-reports` and the "Suggest with AI" button are the
+fastest way to do that by hand.
+
 ## Security
 
 - `helmet` for standard HTTP security headers.
@@ -312,15 +408,19 @@ npm test
 ```
 
 Runs against an isolated in-memory SQLite database (no state leaks between
-runs). 32 tests covering: waitlist validation/dedup/honeypot/rate-limiting,
+runs). 42 tests covering: waitlist validation/dedup/honeypot/rate-limiting,
 admin login/CSRF/session auth, client creation, the invite → accept-invite
 → logged-in-portal flow (including single-use enforcement), manual metric
 entry (server-computed ROAS), the integration credential
 encryption/sync-failure path, SMTP transport config (including the exact
-Resend settings), and Whop webhook signature verification + event mapping
-(valid/tampered/replayed/unmatched, using self-constructed signed
-fixtures). None of these send real email or call a real payment provider —
-they need no real credentials to run in CI.
+Resend settings), Whop webhook signature verification + event mapping
+(valid/tampered/replayed/unmatched/auto-provisioned, using
+self-constructed signed fixtures), and AI automation (report-stats math,
+suggestion approve/dismiss, graceful degradation with no API key — see
+"AI automation" above for what's *not* covered here, since it needs a real
+Claude API call). None of these send real email, call a real payment
+provider, or call a real Claude API — they need no real credentials to run
+in CI.
 
 ## Editing the landing page
 

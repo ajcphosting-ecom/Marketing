@@ -174,6 +174,59 @@ function experimentsPanel({ client, experiments, csrfToken }) {
   `;
 }
 
+function suggestionsPanel({ client, suggestions, aiConfigured, csrfToken }) {
+  return html`
+    <div class="panel" style="margin-bottom:24px;">
+      <div class="panel-head">
+        <h2>AI-suggested experiments${suggestions.length ? ` (${suggestions.length})` : ""}</h2>
+        <form method="POST" action="/admin/clients/${client.id}/experiments/suggest" class="inline">
+          <input type="hidden" name="_csrf" value="${csrfToken}" />
+          <button type="submit" class="btn btn-ghost btn-sm" ${aiConfigured ? "" : "disabled"}>Suggest with AI</button>
+        </form>
+      </div>
+
+      ${!aiConfigured
+        ? html`<div class="muted" style="padding:14px 20px;">
+            ANTHROPIC_API_KEY isn't set — see README "AI automation" to enable this.
+          </div>`
+        : ""}
+
+      ${suggestions.length === 0
+        ? aiConfigured
+          ? html`<div class="empty">No pending suggestions. Click "Suggest with AI" to get ideas grounded in this client's recent performance.</div>`
+          : ""
+        : suggestions.map(
+            (s) => html`
+              <div style="padding:16px 20px; border-top:1px solid var(--line);">
+                <div style="display:flex; justify-content:space-between; align-items:flex-start; gap:12px; flex-wrap:wrap;">
+                  <div style="flex:1 1 320px;">
+                    <strong>${s.name}</strong>
+                    <span class="muted" style="margin-left:8px;">${s.channel}</span>
+                    <div class="muted" style="margin-top:6px;">${s.rationale}</div>
+                    <div class="muted" style="margin-top:2px;">Expected impact: ${s.expected_impact}</div>
+                  </div>
+                  <div style="display:flex; gap:8px; flex-shrink:0;">
+                    <form method="POST" action="/admin/clients/${client.id}/experiments/suggestions/${s.id}/approve" class="inline">
+                      <input type="hidden" name="_csrf" value="${csrfToken}" />
+                      <button type="submit" class="btn btn-sm">Approve</button>
+                    </form>
+                    <form method="POST" action="/admin/clients/${client.id}/experiments/suggestions/${s.id}/dismiss" class="inline">
+                      <input type="hidden" name="_csrf" value="${csrfToken}" />
+                      <button type="submit" class="btn btn-ghost btn-sm">Dismiss</button>
+                    </form>
+                  </div>
+                </div>
+              </div>
+            `
+          )}
+      <p class="muted" style="padding:${suggestions.length ? "16px 20px 0" : "0 20px 16px"};">
+        Claude proposes based on this client's numbers — nothing runs until you approve it, which turns
+        the idea into a real, running experiment above.
+      </p>
+    </div>
+  `;
+}
+
 function metricsPanel({ client, metrics, csrfToken }) {
   const today = new Date().toISOString().slice(0, 10);
   return html`
@@ -265,7 +318,19 @@ function integrationsPanel({ client, integrations, csrfToken }) {
   `;
 }
 
-function clientDetailPage({ client, users, invites, experiments, metrics, integrations, csrfToken, flash, appBaseUrl }) {
+function clientDetailPage({
+  client,
+  users,
+  invites,
+  experiments,
+  suggestions,
+  aiConfigured,
+  metrics,
+  integrations,
+  csrfToken,
+  flash,
+  appBaseUrl,
+}) {
   const body = html`
     <a href="/admin/clients" class="muted" style="text-decoration:none;">← All clients</a>
     <h1 style="margin-top:10px;">${client.name}</h1>
@@ -276,6 +341,7 @@ function clientDetailPage({ client, users, invites, experiments, metrics, integr
     ${billingPanel({ client, csrfToken })}
     ${usersAndInvites({ client, users, invites, csrfToken, appBaseUrl })}
     ${experimentsPanel({ client, experiments, csrfToken })}
+    ${suggestionsPanel({ client, suggestions: suggestions || [], aiConfigured, csrfToken })}
     ${metricsPanel({ client, metrics, csrfToken })}
     ${integrationsPanel({ client, integrations, csrfToken })}
   `;
