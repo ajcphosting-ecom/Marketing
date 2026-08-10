@@ -1,0 +1,32 @@
+{
+  "name": "ampcurve-landing",
+  "version": "1.0.0",
+  "description": "Ampcurve marketing optimization agency — landing page with waitlist signup.",
+  "private": true,
+  "main": "server.js",
+  "scripts": {
+    "start": "node server.js",
+    "dev": "node --watch server.js",
+    "migrate": "node -e \"require('./db').getDb(); console.log('Migrations up to date.');\"",
+    "seed:portal": "node scripts/seed-portal-demo.js",
+    "hash-password": "node scripts/hash-password.js",
+    "test-email": "node scripts/send-test-email.js",
+    "send-weekly-reports": "node scripts/send-weekly-reports.js",
+    "test": "node --test test/*.test.js"
+  },
+  "engines": {
+    "node": ">=18"
+  },
+  "dependencies": {
+    "@anthropic-ai/sdk": "^0.116.0",
+    "bcryptjs": "^3.0.3",
+    "better-sqlite3": "^13.0.3",
+    "cookie-session": "^2.1.1",
+    "dotenv": "^17.4.2",
+    "express": "^4.19.2",
+    "express-rate-limit": "^8.6.2",
+    "helmet": "^8.3.0",
+    "node-cron": "^4.6.0",
+    "nodemailer": "^9.0.5"
+  }
+}
