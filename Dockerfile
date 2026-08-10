@@ -25,10 +25,13 @@ RUN npm ci --omit=dev
 
 COPY . .
 
-# Data dir holds the SQLite file — mount it as a volume in production so
-# signups survive container restarts/redeploys.
+# Data dir holds the SQLite file. No `VOLUME` instruction here — that's
+# left to the host platform's own volume mechanism (e.g. Railway Volumes,
+# or the named volume in docker-compose.yml), since some platforms reject
+# a Dockerfile-level VOLUME outright. Just make sure the directory exists
+# and is writable by the user the app runs as; whatever gets mounted over
+# it in production inherits that.
 RUN mkdir -p /app/data && chown -R node:node /app
-VOLUME ["/app/data"]
 
 USER node
 EXPOSE 3000
